@@ -1,0 +1,6 @@
+#!/usr/bin/env node
+
+process.env.NODE_ENV = 'production'
+process.env.PROCESS_TYPE = 'scrapper'
+
+require('../')

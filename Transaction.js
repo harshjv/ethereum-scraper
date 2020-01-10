@@ -25,22 +25,44 @@ const TransactionSchema = new mongoose.Schema({
     type: Number,
     index: true
   },
-  verified: {
+  status: {
     type: Boolean,
     index: true
+  },
+  input: {
+    type: String,
+    index: true
+  },
+  contractAddress: {
+    type: String,
+    index: true
+  },
+  timestamp: {
+    type: Number
+  },
+  value: {
+    type: Number
   }
 })
 
-TransactionSchema.static('getLastVerifiedBlockNumber', function () {
+TransactionSchema.static('getLastBlockInRange', function (start, end) {
+  const query = {
+    blockNumber: {
+      $gte: Number(start)
+    }
+  }
+
+  if (end) {
+    query.blockNumber.$lte = Number(end)
+  }
+
   return Transaction
-    .findOne({ verified: true })
+    .findOne(query)
     .sort('-blockNumber')
     .select('blockNumber')
     .exec()
     .then(tx => {
       if (tx) return tx.blockNumber
-
-      return 0
     })
 })
 

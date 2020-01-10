@@ -1,128 +1,136 @@
+const Bluebird = require('bluebird')
 const Web3 = require('web3')
 
 const Transaction = require('./Transaction')
 
 const {
   WEB3_URI,
-  MAX_BATCH_SIZE,
-  START_FROM,
-  NO_PREVIOUS
+  MAX_BLOCK_BATCH_SIZE,
+  MAX_TRANSACTION_BATCH_SIZE,
+  START_BLOCK,
+  END_BLOCK,
+  REORG_GAP
 } = process.env
 
-if (!WEB3_URI) throw new Error('Invalid WEB3_URI')
-if (!MAX_BATCH_SIZE) throw new Error('Invalid MAX_BATCH_SIZE')
-if (!START_FROM) throw new Error('Invalid START_FROM')
+if (!MAX_BLOCK_BATCH_SIZE) throw new Error('Invalid MAX_BLOCK_BATCH_SIZE')
+if (!MAX_TRANSACTION_BATCH_SIZE) throw new Error('Invalid MAX_TRANSACTION_BATCH_SIZE')
+if (!START_BLOCK) throw new Error('Invalid START_BLOCK')
+if (!REORG_GAP) throw new Error('Invalid REORG_GAP')
 
+let syncing = true
+let latestBlockNumber = null
 const web3 = new Web3(WEB3_URI)
 
-let latestBlockStartedFrom = null
-const REVISIT_BLOCKS_MAP = {}
-
-async function handleBlock (blockNum, verified) {
+async function handleBlock (blockNum) {
   if (!blockNum) return
-  if (verified) {
-    const exist = await Transaction.findOne({ blockNumber: blockNum }).exec()
 
-    if (exist) {
-      if (!exist.verified) {
-        await Transaction.updateMany({ blockNumber: blockNum }, { $set: { verified: true } }).exec()
-        console.log(`✅ #${blockNum}`)
-      }
-
-      return
-    }
-  }
+  const exist = await Transaction.findOne({
+    blockNumber: blockNum
+  }).exec()
+  if (exist) return
 
   const block = await web3.eth.getBlock(blockNum, true)
-  if (block) {
-    if (REVISIT_BLOCKS_MAP[`${blockNum}`]) {
-      delete REVISIT_BLOCKS_MAP[`${blockNum}`]
-    }
-  } else {
-    REVISIT_BLOCKS_MAP[`${blockNum}`] = true
-    return
-  }
+  if (!block) return
 
   const blockNumber = block.number
   const blockHash = block.hash
+  const timestamp = block.timestamp
 
-  let transactions = block.transactions.map(({ hash, from, to }) => {
+  let transactions = await Bluebird.map(block.transactions, async ({ hash, from, to, input, value }) => {
+    const { status, contractAddress } = await web3.eth.getTransactionReceipt(hash)
+
     return {
       from,
       to,
       hash,
       blockHash,
       blockNumber,
-      verified
+      status,
+      input,
+      contractAddress,
+      timestamp,
+      value
     }
-  })
+  }, { concurrency: Number(MAX_TRANSACTION_BATCH_SIZE) })
 
   if (transactions.length === 0) {
     transactions = [{
       blockHash,
-      blockNumber,
-      verified
+      blockNumber
     }]
   }
 
   await Transaction.insertMany(transactions, { ordered: false })
 
   const log = [
-    verified ? '📝' : '⚡️',
     `#${blockNumber}[${block.transactions.length}]`
   ]
 
-  if (verified && latestBlockStartedFrom) {
-    const diff = latestBlockStartedFrom - blockNum
-    const progress = Math.floor((1 - (diff / latestBlockStartedFrom)) * 10000) / 100
+  const compareWith = Number(END_BLOCK) || latestBlockNumber
+  if (compareWith) {
+    const diff = compareWith - blockNum
+    const progress = Math.floor((1 - (diff / compareWith)) * 10000) / 100
     log.push(`${progress}%`)
   }
 
   console.log(log.join(' '))
 }
 
-async function syncFromStart () {
-  const lastVerifiedBlockblockNumber = await Transaction.getLastVerifiedBlockNumber()
-  const startFromBlockNumber = Math.max(lastVerifiedBlockblockNumber + 1, Number(START_FROM))
+async function sync () {
+  const lastBlockInRange = await Transaction.getLastBlockInRange(START_BLOCK, END_BLOCK)
+
+  let startFrom
+  if (lastBlockInRange) {
+    startFrom = lastBlockInRange + 1
+  } else {
+    startFrom = Number(START_BLOCK)
+  }
 
   let batch = []
-
-  for (let i = startFromBlockNumber; ; i++) {
-    batch.push(handleBlock(i, true))
-
-    if (batch.length === Number(MAX_BATCH_SIZE)) {
+  for (let i = startFrom; ; i++) {
+    if (batch.length === Number(MAX_BLOCK_BATCH_SIZE)) {
       await Promise.all(batch)
       batch = []
     }
 
-    if (latestBlockStartedFrom && i >= latestBlockStartedFrom) {
+    if (END_BLOCK && i >= Number(END_BLOCK)) {
+      console.log('Reached END_BLOCK', END_BLOCK)
       break
     }
+
+    if (latestBlockNumber && i >= latestBlockNumber) {
+      console.log('Reached latestBlockNumber', latestBlockNumber)
+      break
+    }
+
+    batch.push(handleBlock(i))
   }
+
+  if (batch.length !== 0) {
+    await Promise.all(batch)
+  }
+
+  syncing = false
+
+  console.log('Synced!')
 }
 
-async function syncFromEnd () {
+async function latest () {
+  const gap = Number(REORG_GAP)
   const subscription = web3.eth.subscribe('newBlockHeaders')
 
   subscription.on('data', block => {
     if (block) {
-      handleBlock(block.number)
+      latestBlockNumber = block.number
 
-      if (!latestBlockStartedFrom) latestBlockStartedFrom = block.number
-    }
-
-    const pendingBlockNumbers = Object.keys(REVISIT_BLOCKS_MAP)
-
-    for (let i = 0; i < pendingBlockNumbers.length; i++) {
-      handleBlock(pendingBlockNumbers[i])
+      if (!syncing && !END_BLOCK) {
+        handleBlock(latestBlockNumber - gap)
+      }
     }
   })
 
   subscription.on('error', console.error.bind(console))
 }
 
-if (NO_PREVIOUS !== 'true') {
-  syncFromStart()
-}
-
-syncFromEnd()
+sync()
+latest()
