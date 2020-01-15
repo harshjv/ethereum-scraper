@@ -1,8 +1,16 @@
 {
   "name": "ethereum-scrapper",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Ethereum Scrapper (Mainly eth_getTransactionsByAccount)",
   "main": "index.js",
+  "bin": {
+    "ethereum-scrapper": "./bin/ethereum-scrapper",
+    "ethereum-scrapper-api": "./bin/ethereum-scrapper-api"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/harshjv/ethereum-scrapper.git"
+  },
   "scripts": {
     "test": "standard",
     "api": "PROCESS_TYPE=api node index.js",
