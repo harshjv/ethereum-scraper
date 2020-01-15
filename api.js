@@ -32,8 +32,8 @@ app.get('/txs/:account', asyncHandler(async (req, res, next) => {
   const { account } = req.params
 
   const [latest, txs] = await Promise.all([
-    await web3.eth.getBlock('latest'),
-    await Transaction.find({ from: account }).exec()
+    web3.eth.getBlock('latest'),
+    Transaction.find({ from: account }).exec()
   ])
 
   res.set('Access-Control-Allow-Origin', '*')
