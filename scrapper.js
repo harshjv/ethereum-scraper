@@ -129,7 +129,10 @@ async function latest () {
     }
   })
 
-  subscription.on('error', console.error.bind(console))
+  subscription.on('error', (error) => {
+    console.error(error)
+    process.exit(1)
+  })
 }
 
 sync()
