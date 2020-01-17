@@ -32,7 +32,12 @@ app.get('/txs/:account', asyncHandler(async (req, res, next) => {
   const { account } = req.params
   let { limit, page, sort } = req.query
 
-  const q = Transaction.find({ from: account })
+  const q = Transaction.find({
+    $or: [
+      { to: account },
+      { from: account }
+    ]
+  })
 
   if (sort === 'asc') {
     q.sort('blockNumber')
