@@ -1,20 +1,20 @@
 {
-  "name": "ethereum-scrapper",
+  "name": "ethereum-scraper",
   "version": "0.1.4",
-  "description": "Ethereum Scrapper (Mainly eth_getTransactionsByAccount)",
+  "description": "Ethereum Scraper (Mainly eth_getTransactionsByAccount)",
   "main": "index.js",
   "bin": {
-    "ethereum-scrapper": "./bin/ethereum-scrapper",
-    "ethereum-scrapper-api": "./bin/ethereum-scrapper-api"
+    "ethereum-scraper": "./bin/ethereum-scraper",
+    "ethereum-scraper-api": "./bin/ethereum-scraper-api"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/harshjv/ethereum-scrapper.git"
+    "url": "https://github.com/harshjv/ethereum-scraper.git"
   },
   "scripts": {
     "test": "standard",
     "api": "PROCESS_TYPE=api node index.js",
-    "scrapper": "PROCESS_TYPE=scrapper node index.js",
+    "scraper": "PROCESS_TYPE=scraper node index.js",
     "start": "node index.js"
   },
   "author": "Harsh Vakharia",

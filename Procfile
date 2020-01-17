@@ -1,2 +1,2 @@
 web: npm run api
-worker: npm run scrapper
+worker: npm run scraper

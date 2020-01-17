@@ -26,10 +26,10 @@ switch (PROCESS_TYPE) {
   case 'api':
     require('./api')
     break
-  case 'scrapper':
-    require('./scrapper')
+  case 'scraper':
+    require('./scraper')
     break
   default:
     require('./api')
-    require('./scrapper')
+    require('./scraper')
 }
