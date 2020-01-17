@@ -30,8 +30,7 @@ const TransactionSchema = new mongoose.Schema({
     index: true
   },
   input: {
-    type: String,
-    index: true
+    type: String
   },
   contractAddress: {
     type: String,
