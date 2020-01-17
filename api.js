@@ -47,13 +47,21 @@ app.get('/txs/:account', asyncHandler(async (req, res, next) => {
   }
 
   if (limit || page) {
-    page = Number(page)
-    limit = Number(limit)
+    try {
+      page = parseInt(page)
+      if (!page || page < 1) throw new Error('Invalid page')
+    } catch (e) {
+      page = 1
+    }
 
-    if (!page) page = 1
-    if (!limit) limit = 250
+    try {
+      limit = parseInt(limit)
+      if (!limit) throw new Error('Invalid limit')
+    } catch (e) {
+      limit = 250
+    }
 
-    q.limit(limit).skip(limit * page)
+    q.limit(limit).skip(limit * (page - 1))
   }
 
   const [latest, txs] = await Promise.all([
