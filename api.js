@@ -30,29 +30,59 @@ app.set('etag', false)
 
 app.get('/txs/:account', asyncHandler(async (req, res, next) => {
   const { account } = req.params
+  let { limit, page, sort } = req.query
+
+  const q = Transaction.find({ from: account })
+
+  if (sort === 'asc') {
+    q.sort('blockNumber')
+  } else {
+    sort = 'desc'
+    q.sort('-blockNumber')
+  }
+
+  if (limit || page) {
+    page = Number(page)
+    limit = Number(limit)
+
+    if (!page) page = 1
+    if (!limit) limit = 250
+
+    q.limit(limit).skip(limit * page)
+  }
 
   const [latest, txs] = await Promise.all([
     web3.eth.getBlock('latest'),
-    Transaction.find({ from: account }).exec()
+    q.exec()
   ])
+
+  const data = {}
+
+  if (limit || page) {
+    data.pagination = {
+      sort,
+      page,
+      limit
+    }
+  }
+
+  data.txs = txs.map(tx => {
+    const json = tx.toJSON()
+
+    delete json._id
+    delete json.verified
+    delete json.__v
+
+    json.confirmations = latest.number - tx.blockNumber
+
+    return json
+  })
 
   res.set('Access-Control-Allow-Origin', '*')
 
   res.json({
     status: 'OK',
-    data: {
-      txs: txs.map(tx => {
-        const json = tx.toJSON()
-
-        delete json._id
-        delete json.verified
-        delete json.__v
-
-        json.confirmations = latest.number - tx.blockNumber
-
-        return json
-      })
-    }
+    data
   })
 }))
 
