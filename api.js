@@ -28,6 +28,26 @@ app.use(helmet())
 app.use(compression())
 app.set('etag', false)
 
+app.get('/status', asyncHandler(async (req, res, next) => {
+  const [latest, tx] = await Promise.all([
+    web3.eth.getBlock('latest'),
+    Transaction.findOne({}).sort('-blockNumber').select('blockNumber').exec()
+  ])
+
+  res.set('Access-Control-Allow-Origin', '*')
+
+  res.json({
+    status: 'OK',
+    data: {
+      status: {
+        latestBlockNumber: latest.number,
+        latestScrapedBlockNumber: tx.blockNumber,
+        difference: latest.number - tx.blockNumber
+      }
+    }
+  })
+}))
+
 app.get('/txs/:account', asyncHandler(async (req, res, next) => {
   const { account } = req.params
   let { limit, page, sort } = req.query
