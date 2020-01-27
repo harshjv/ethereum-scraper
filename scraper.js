@@ -109,6 +109,8 @@ async function sync () {
 
   let batch = []
   for (let i = startFrom; ; i++) {
+    batch.push(handleBlock(i))
+
     if (batch.length === Number(MAX_BLOCK_BATCH_SIZE)) {
       await Promise.all(batch)
       batch = []
@@ -123,8 +125,6 @@ async function sync () {
       console.log('Reached latestBlockNumber', latestBlockNumber)
       break
     }
-
-    batch.push(handleBlock(i))
   }
 
   if (batch.length !== 0) {
