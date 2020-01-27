@@ -17,9 +17,25 @@ if (!MAX_TRANSACTION_BATCH_SIZE) throw new Error('Invalid MAX_TRANSACTION_BATCH_
 if (!START_BLOCK) throw new Error('Invalid START_BLOCK')
 if (!REORG_GAP) throw new Error('Invalid REORG_GAP')
 
+let web3
 let syncing = true
 let latestBlockNumber = null
-const web3 = new Web3(WEB3_URI)
+
+function handleError (e) {
+  console.error(e)
+  process.exit(1)
+}
+
+if (WEB3_URI.startsWith('ws')) {
+  const provider = new Web3.providers.WebsocketProvider(WEB3_URI)
+
+  provider.on('error', handleError)
+  provider.on('end', handleError)
+
+  web3 = new Web3(provider)
+} else {
+  web3 = new Web3(WEB3_URI)
+}
 
 async function handleBlock (blockNum) {
   if (!blockNum) return
@@ -129,10 +145,7 @@ async function latest () {
     }
   })
 
-  subscription.on('error', (error) => {
-    console.error(error)
-    process.exit(1)
-  })
+  subscription.on('error', handleError)
 }
 
 sync()
