@@ -27,7 +27,12 @@ function handleError (e) {
 }
 
 if (WEB3_URI.startsWith('ws')) {
-  const provider = new Web3.providers.WebsocketProvider(WEB3_URI)
+  const provider = new Web3.providers.WebsocketProvider(WEB3_URI, {
+    clientConfig: {
+      maxReceivedFrameSize: 100000000,
+      maxReceivedMessageSize: 100000000
+    }
+  })
 
   provider.on('error', handleError)
   provider.on('end', handleError)
