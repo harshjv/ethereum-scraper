@@ -66,23 +66,21 @@ app.get('/txs/:account', asyncHandler(async (req, res, next) => {
     q.sort('-blockNumber')
   }
 
-  if (limit || page) {
-    try {
-      page = parseInt(page)
-      if (!page || page < 1) throw new Error('Invalid page')
-    } catch (e) {
-      page = 1
-    }
-
-    try {
-      limit = parseInt(limit)
-      if (!limit) throw new Error('Invalid limit')
-    } catch (e) {
-      limit = 250
-    }
-
-    q.limit(limit).skip(limit * (page - 1))
+  try {
+    page = parseInt(page)
+    if (!page || page < 1) throw new Error('Invalid page')
+  } catch (e) {
+    page = 1
   }
+
+  try {
+    limit = parseInt(limit)
+    if (!limit || limit < 1 || limit > 250) throw new Error('Invalid limit')
+  } catch (e) {
+    limit = 250
+  }
+
+  q.limit(limit).skip(limit * (page - 1))
 
   const [latest, txs] = await Promise.all([
     web3.eth.getBlock('latest'),
