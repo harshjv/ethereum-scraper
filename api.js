@@ -29,22 +29,42 @@ app.use(compression())
 app.set('etag', false)
 
 app.get('/status', asyncHandler(async (req, res, next) => {
+  let { maxgap } = req.query
+
   const [latest, tx] = await Promise.all([
     web3.eth.getBlock('latest'),
     Transaction.findOne({}).sort('-blockNumber').select('blockNumber').exec()
   ])
 
+  const difference = latest.number - tx.blockNumber
+
+  try {
+    maxgap = parseInt(maxgap)
+    if (!maxgap || maxgap < 1) throw new Error('Invalid maxgap')
+  } catch (e) {
+    maxgap = false
+  }
+
   res.set('Access-Control-Allow-Origin', '*')
+
+  const status = {
+    latestBlockNumber: latest.number,
+    latestScrapedBlockNumber: tx.blockNumber,
+    difference
+  }
+
+  if (maxgap && difference > maxgap) {
+    res.status(503)
+    res.json({
+      status: 'ERROR',
+      data: { status }
+    })
+    return
+  }
 
   res.json({
     status: 'OK',
-    data: {
-      status: {
-        latestBlockNumber: latest.number,
-        latestScrapedBlockNumber: tx.blockNumber,
-        difference: latest.number - tx.blockNumber
-      }
-    }
+    data: { status }
   })
 }))
 
