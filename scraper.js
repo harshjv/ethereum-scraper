@@ -1,3 +1,4 @@
+const Sentry = require('@sentry/node')
 const Bluebird = require('bluebird')
 const Web3 = require('web3')
 
@@ -58,19 +59,36 @@ async function handleBlock (blockNum) {
   const timestamp = block.timestamp
 
   let transactions = await Bluebird.map(block.transactions, async ({ hash, from, to, input, value }) => {
-    const { status, contractAddress } = await web3.eth.getTransactionReceipt(hash)
+    try {
+      const { status, contractAddress } = await web3.eth.getTransactionReceipt(hash)
 
-    return {
-      from,
-      to,
-      hash,
-      blockHash,
-      blockNumber,
-      status,
-      input,
-      contractAddress,
-      timestamp,
-      value
+      return {
+        from,
+        to,
+        hash,
+        blockHash,
+        blockNumber,
+        status,
+        input,
+        contractAddress,
+        timestamp,
+        value
+      }
+    } catch (e) {
+      Sentry.withScope(scope => {
+        scope.setTag('blockNumber', blockNumber)
+        scope.setTag('blockHash', blockHash)
+        scope.setTag('hash', hash)
+        scope.setTag('from', from)
+        scope.setTag('to', to)
+
+        scope.setExtra('input', input)
+        scope.setExtra('value', value)
+
+        Sentry.captureException(e)
+      })
+
+      throw e
     }
   }, { concurrency: Number(MAX_TRANSACTION_BATCH_SIZE) })
 
