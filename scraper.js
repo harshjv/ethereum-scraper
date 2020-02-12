@@ -43,6 +43,22 @@ if (WEB3_URI.startsWith('ws')) {
   web3 = new Web3(WEB3_URI)
 }
 
+function sleep (duration) {
+  return new Promise((resolve, reject) => setTimeout(resolve, duration))
+}
+
+async function getTransactionReceipt (hash, attempts = 1) {
+  const receipt = await web3.eth.getTransactionReceipt(hash)
+  if (receipt) return receipt
+
+  if (!receipt && attempts <= 3) {
+    await sleep(5000)
+    return getTransactionReceipt(hash, attempts + 1)
+  }
+
+  throw new Error('Unable to fetch transaction receipt')
+}
+
 async function handleBlock (blockNum) {
   if (!blockNum) return
 
@@ -60,7 +76,7 @@ async function handleBlock (blockNum) {
 
   let transactions = await Bluebird.map(block.transactions, async ({ hash, from, to, input, value }) => {
     try {
-      const { status, contractAddress } = await web3.eth.getTransactionReceipt(hash)
+      const { status, contractAddress } = await getTransactionReceipt(hash)
 
       return {
         from,
