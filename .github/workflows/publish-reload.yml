@@ -1,4 +1,4 @@
-name: Publish & reload atomicagent
+name: Publish & reload scraper
 
 on:
   create:
