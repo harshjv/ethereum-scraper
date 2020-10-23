@@ -17,6 +17,17 @@ const {
 
 if (!PORT) throw new Error('Invalid PORT')
 
+const parseNonZeroPositiveIntOrDefault = (value, cond, defaultValue) => {
+  try {
+    value = parseInt(value)
+    if (!(value > 0)) throw new Error('Invalid value')
+  } catch (e) {
+    return defaultValue
+  }
+
+  return value
+}
+
 const web3 = new Web3(WEB3_URI)
 const app = express()
 
@@ -38,12 +49,7 @@ app.get('/status', asyncHandler(async (req, res, next) => {
 
   const difference = latest.number - tx.blockNumber
 
-  try {
-    maxgap = parseInt(maxgap)
-    if (!maxgap || maxgap < 1) throw new Error('Invalid maxgap')
-  } catch (e) {
-    maxgap = false
-  }
+  maxgap = parseNonZeroPositiveIntOrDefault(maxgap, false)
 
   res.set('Access-Control-Allow-Origin', '*')
 
@@ -70,9 +76,30 @@ app.get('/status', asyncHandler(async (req, res, next) => {
 
 app.get('/txs/:account', asyncHandler(async (req, res, next) => {
   const { account } = req.params
-  let { limit, page, sort } = req.query
+  let { limit, page, sort, fromBlock, toBlock } = req.query
+
+  const blockQuery = {}
+  fromBlock = parseNonZeroPositiveIntOrDefault(fromBlock, false)
+  toBlock = parseNonZeroPositiveIntOrDefault(toBlock, false)
+
+  if (fromBlock !== false) {
+    blockQuery.blockNumber = {
+      $gte: fromBlock
+    }
+  }
+
+  if (toBlock !== false) {
+    if (fromBlock !== false) {
+      blockQuery.blockNumber.$lte = toBlock
+    } else {
+      blockQuery.blockNumber = {
+        $lte: toBlock
+      }
+    }
+  }
 
   const q = Transaction.find({
+    ...blockQuery,
     $or: [
       { to: account },
       { from: account }
@@ -86,19 +113,8 @@ app.get('/txs/:account', asyncHandler(async (req, res, next) => {
     q.sort('-blockNumber')
   }
 
-  try {
-    page = parseInt(page)
-    if (!page || page < 1) throw new Error('Invalid page')
-  } catch (e) {
-    page = 1
-  }
-
-  try {
-    limit = parseInt(limit)
-    if (!limit || limit < 1 || limit > 250) throw new Error('Invalid limit')
-  } catch (e) {
-    limit = 250
-  }
+  page = parseNonZeroPositiveIntOrDefault(page, 1)
+  limit = parseNonZeroPositiveIntOrDefault(limit, 1)
 
   q.limit(limit).skip(limit * (page - 1))
 
