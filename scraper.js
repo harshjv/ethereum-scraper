@@ -171,6 +171,8 @@ async function sync () {
 }
 
 async function latest () {
+  latestBlockNumber = await web3.eth.getBlockNumber()
+
   const gap = Number(REORG_GAP)
   const subscription = web3.eth.subscribe('newBlockHeaders')
 
@@ -187,5 +189,4 @@ async function latest () {
   subscription.on('error', handleError)
 }
 
-sync()
-latest()
+latest().then(() => sync())
