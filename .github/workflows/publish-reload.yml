@@ -13,10 +13,9 @@ jobs:
       - uses: actions/setup-node@v1
         with:
           node-version: 8
-      - run: npm install
+      - run: npm ci
       - run: echo "//registry.npmjs.org/:_authToken=${{secrets.NPM_TOKEN}}" > ~/.npmrc
       - run: npm publish --access public
-      - run: sleep 10
 
   deploy:
     needs: publish
