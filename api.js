@@ -17,7 +17,7 @@ const {
 
 if (!PORT) throw new Error('Invalid PORT')
 
-const parseNonZeroPositiveIntOrDefault = (value, cond, defaultValue) => {
+const parseNonZeroPositiveIntOrDefault = (value, defaultValue) => {
   try {
     value = parseInt(value)
     if (!(value > 0)) throw new Error('Invalid value')
