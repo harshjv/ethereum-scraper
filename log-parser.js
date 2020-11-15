@@ -1,3 +1,4 @@
+const Sentry = require('@sentry/node')
 const Abi = require('web3-eth-abi')
 
 const EVENTS = require('./events.json')
@@ -14,17 +15,30 @@ function ensure0x (value) {
 
 module.exports = logs => logs.map(log => {
   const { address, topics, data } = log
-  const topic0 = topics.shift()
-  const event = EVENT_SIG_MAP[topic0]
+  const signature = topics.shift()
+  const event = EVENT_SIG_MAP[signature]
   if (!event) return false
 
-  const { from, to, value } = Abi.decodeLog(event.abi, data, topics)
+  try {
+    const { from, to, value } = Abi.decodeLog(event.abi, data, topics)
 
-  return {
-    signature: ensure0x(event.signature),
-    contractAddress: ensure0x(address),
-    from: ensure0x(from),
-    to: ensure0x(to),
-    value
+    return {
+      signature: ensure0x(event.signature),
+      contractAddress: ensure0x(address),
+      from: ensure0x(from),
+      to: ensure0x(to),
+      value
+    }
+  } catch (e) {
+    Sentry.withScope(scope => {
+      scope.setTag('signature', signature)
+
+      scope.setExtra('data', data)
+      scope.setExtra('topics', topics)
+
+      Sentry.captureException(e)
+    })
+
+    return false
   }
 }).filter(log => log !== false)
