@@ -2,6 +2,8 @@ const Sentry = require('@sentry/node')
 const Bluebird = require('bluebird')
 const Web3 = require('web3')
 
+const LogParser = require('./log-parser')
+const Event = require('./Event')
 const Transaction = require('./Transaction')
 
 const {
@@ -74,11 +76,23 @@ async function handleBlock (blockNum) {
   const blockHash = block.hash
   const timestamp = block.timestamp
 
-  let transactions = await Bluebird.map(block.transactions, async ({ hash, from, to, input, value }) => {
-    try {
-      const { status, contractAddress } = await getTransactionReceipt(hash)
+  const events = []
+  let transactions = []
 
-      return {
+  await Bluebird.map(block.transactions, async ({ hash, from, to, input, value }) => {
+    try {
+      const { status, contractAddress, logs } = await getTransactionReceipt(hash)
+
+      events.push(...LogParser(logs).map(log => ({
+        ...log,
+        txHash: hash,
+        blockHash,
+        blockNumber,
+        status,
+        timestamp
+      })))
+
+      transactions.push({
         from,
         to,
         hash,
@@ -89,7 +103,7 @@ async function handleBlock (blockNum) {
         contractAddress,
         timestamp,
         value
-      }
+      })
     } catch (e) {
       Sentry.withScope(scope => {
         scope.setTag('blockNumber', blockNumber)
@@ -116,6 +130,10 @@ async function handleBlock (blockNum) {
   }
 
   await Transaction.insertMany(transactions, { ordered: false })
+
+  if (events.length > 0) {
+    await Event.insertMany(events, { ordered: false })
+  }
 
   const log = [
     `#${blockNumber}[${block.transactions.length}]`

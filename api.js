@@ -6,6 +6,7 @@ const helmet = require('helmet')
 const compression = require('compression')
 const asyncHandler = require('express-async-handler')
 
+const Event = require('./Event')
 const Transaction = require('./Transaction')
 const httpError = require('./http-error')
 
@@ -99,6 +100,92 @@ app.get('/txs/:account', asyncHandler(async (req, res, next) => {
   }
 
   const q = Transaction.find({
+    ...blockQuery,
+    $or: [
+      { to: account },
+      { from: account }
+    ]
+  })
+
+  if (sort === 'asc') {
+    q.sort('blockNumber')
+  } else {
+    sort = 'desc'
+    q.sort('-blockNumber')
+  }
+
+  page = parseNonZeroPositiveIntOrDefault(page, 1)
+  limit = parseNonZeroPositiveIntOrDefault(limit, 1)
+
+  q.limit(limit).skip(limit * (page - 1))
+
+  const [latest, txs] = await Promise.all([
+    web3.eth.getBlock('latest'),
+    q.exec()
+  ])
+
+  const data = {}
+
+  if (limit || page) {
+    data.pagination = {
+      sort,
+      page,
+      limit
+    }
+  }
+
+  data.txs = txs.map(tx => {
+    const json = tx.toJSON()
+
+    delete json._id
+    delete json.verified
+    delete json.__v
+
+    json.confirmations = latest.number - tx.blockNumber
+
+    return json
+  })
+
+  res.set('Access-Control-Allow-Origin', '*')
+
+  res.json({
+    status: 'OK',
+    data
+  })
+}))
+
+app.get('/events/:account', asyncHandler(async (req, res, next) => {
+  const { account } = req.params
+  let { signature, contractAddress, limit, page, sort, fromBlock, toBlock } = req.query
+
+  if (!signature) return httpError(req, res, 400, 'Missing field: signature')
+  if (!contractAddress) return httpError(req, res, 400, 'Missing field: contractAddress')
+
+  const blockQuery = {
+    signature,
+    contractAddress
+  }
+
+  fromBlock = parseNonZeroPositiveIntOrDefault(fromBlock, false)
+  toBlock = parseNonZeroPositiveIntOrDefault(toBlock, false)
+
+  if (fromBlock !== false) {
+    blockQuery.blockNumber = {
+      $gte: fromBlock
+    }
+  }
+
+  if (toBlock !== false) {
+    if (fromBlock !== false) {
+      blockQuery.blockNumber.$lte = toBlock
+    } else {
+      blockQuery.blockNumber = {
+        $lte: toBlock
+      }
+    }
+  }
+
+  const q = Event.find({
     ...blockQuery,
     $or: [
       { to: account },
