@@ -16,7 +16,7 @@ module.exports = logs => logs.map(log => {
   const { address, topics, data } = log
   const topic0 = topics.shift()
   const event = EVENT_SIG_MAP[topic0]
-  if (!event) return
+  if (!event) return false
 
   const { from, to, value } = Abi.decodeLog(event.abi, data, topics)
 
@@ -27,4 +27,4 @@ module.exports = logs => logs.map(log => {
     to: ensure0x(to),
     value
   }
-})
+}).filter(log => log !== false)
