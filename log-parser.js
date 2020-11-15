@@ -7,6 +7,11 @@ const EVENT_SIG_MAP = EVENTS.reduce((acc, event) => {
   return acc
 }, {})
 
+function ensure0x (value) {
+  if (value.startsWith('0x')) return value
+  return `0x${value}`
+}
+
 module.exports = logs => logs.map(log => {
   const { address, topics, data } = log
   const topic0 = topics.shift()
@@ -16,10 +21,10 @@ module.exports = logs => logs.map(log => {
   const { from, to, value } = Abi.decodeLog(event.abi, data, topics)
 
   return {
-    signature: event.signature,
-    contractAddress: address,
-    from,
-    to,
+    signature: ensure0x(event.signature),
+    contractAddress: ensure0x(address),
+    from: ensure0x(from),
+    to: ensure0x(to),
     value
   }
 })
