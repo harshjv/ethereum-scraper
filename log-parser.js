@@ -19,11 +19,14 @@ module.exports = logs => logs.map(log => {
   const event = EVENT_SIG_MAP[signature]
   if (!event) return false
 
+  const { abi } = event
+  if (topics.length !== (abi.length - 1)) return false
+
   try {
-    const { from, to, value } = Abi.decodeLog(event.abi, data, topics)
+    const { from, to, value } = Abi.decodeLog(abi, data, topics)
 
     return {
-      signature: ensure0x(event.signature),
+      signature: ensure0x(signature),
       contractAddress: ensure0x(address),
       from: ensure0x(from),
       to: ensure0x(to),
