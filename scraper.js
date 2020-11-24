@@ -214,6 +214,8 @@ function subscribe () {
 }
 
 function poll () {
+  if (!BLOCKTIME) throw new Error('Invalid BLOCKTIME')
+
   web3.eth.getBlockNumber()
     .then(blockNumber => {
       if (latestBlockNumber === blockNumber) {
