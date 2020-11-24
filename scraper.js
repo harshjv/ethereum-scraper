@@ -12,13 +12,16 @@ const {
   MAX_TRANSACTION_BATCH_SIZE,
   START_BLOCK,
   END_BLOCK,
-  REORG_GAP
+  REORG_GAP,
+  BLOCKTIME
 } = process.env
 
 if (!MAX_BLOCK_BATCH_SIZE) throw new Error('Invalid MAX_BLOCK_BATCH_SIZE')
 if (!MAX_TRANSACTION_BATCH_SIZE) throw new Error('Invalid MAX_TRANSACTION_BATCH_SIZE')
 if (!START_BLOCK) throw new Error('Invalid START_BLOCK')
 if (!REORG_GAP) throw new Error('Invalid REORG_GAP')
+
+const SUPPORTS_WS = WEB3_URI.startsWith('ws')
 
 let web3
 let syncing = true
@@ -29,7 +32,7 @@ function handleError (e) {
   process.exit(1)
 }
 
-if (WEB3_URI.startsWith('ws')) {
+if (SUPPORTS_WS) {
   const provider = new Web3.providers.WebsocketProvider(WEB3_URI, {
     clientConfig: {
       maxReceivedFrameSize: 100000000,
@@ -46,7 +49,7 @@ if (WEB3_URI.startsWith('ws')) {
 }
 
 function sleep (duration) {
-  return new Promise((resolve, reject) => setTimeout(resolve, duration))
+  return new Promise(resolve => setTimeout(resolve, duration))
 }
 
 async function getTransactionReceipt (hash, attempts = 1) {
@@ -188,23 +191,40 @@ async function sync () {
   console.log('Synced!')
 }
 
-async function latest () {
+async function getLatestBlock () {
   latestBlockNumber = await web3.eth.getBlockNumber()
+}
 
-  const gap = Number(REORG_GAP)
+function onNewBlock (blockNumber) {
+  latestBlockNumber = blockNumber
+
+  if (!syncing && !END_BLOCK) {
+    handleBlock(latestBlockNumber - Number(REORG_GAP))
+  }
+}
+
+function subscribe () {
   const subscription = web3.eth.subscribe('newBlockHeaders')
 
   subscription.on('data', block => {
-    if (block) {
-      latestBlockNumber = block.number
-
-      if (!syncing && !END_BLOCK) {
-        handleBlock(latestBlockNumber - gap)
-      }
-    }
+    if (block) onNewBlock(block.number)
   })
 
   subscription.on('error', handleError)
 }
 
-latest().then(() => sync())
+function poll () {
+  web3.eth.getBlockNumber()
+    .then(blockNumber => {
+      if (latestBlockNumber === blockNumber) {
+        return sleep(Number(BLOCKTIME))
+      } else {
+        return onNewBlock(blockNumber)
+      }
+    })
+    .then(poll)
+}
+
+getLatestBlock()
+  .then(() => SUPPORTS_WS ? subscribe() : poll())
+  .then(() => sync())
