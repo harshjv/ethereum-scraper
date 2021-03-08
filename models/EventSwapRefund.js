@@ -1,27 +1,10 @@
 const mongoose = require('mongoose')
 
-const EventSchema = new mongoose.Schema({
-  signature: {
-    type: String,
-    index: true
-  },
+const EventSwapRefundSchema = new mongoose.Schema({
   contractAddress: {
     type: String,
     index: true,
     lowercase: true
-  },
-  from: {
-    type: String,
-    index: true,
-    lowercase: true
-  },
-  to: {
-    type: String,
-    index: true,
-    lowercase: true
-  },
-  value: {
-    type: Number
   },
   txHash: {
     type: String,
@@ -46,5 +29,4 @@ const EventSchema = new mongoose.Schema({
   }
 })
 
-const Event = mongoose.model('Event', EventSchema)
-module.exports = Event
+module.exports = mongoose.model('EventSwapRefund', EventSwapRefundSchema)

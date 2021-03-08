@@ -2,9 +2,9 @@ const Sentry = require('@sentry/node')
 const Bluebird = require('bluebird')
 const Web3 = require('web3')
 
-const LogParser = require('./log-parser')
-const Event = require('./Event')
-const Transaction = require('./Transaction')
+const eventList = require('./eventList')
+const Transaction = require('./models/Transaction')
+const { logParser } = require('./utils')
 
 const {
   WEB3_URI,
@@ -56,7 +56,7 @@ async function getTransactionReceipt (hash, attempts = 1) {
   const receipt = await web3.eth.getTransactionReceipt(hash)
   if (receipt) return receipt
 
-  if (!receipt && attempts <= 3) {
+  if (attempts <= 3) {
     await sleep(5000)
     return getTransactionReceipt(hash, attempts + 1)
   }
@@ -79,21 +79,26 @@ async function handleBlock (blockNum) {
   const blockHash = block.hash
   const timestamp = block.timestamp
 
-  const events = []
+  const events = {}
   let transactions = []
 
   await Bluebird.map(block.transactions, async ({ hash, from, to, input, value }) => {
     try {
       const { status, contractAddress, logs } = await getTransactionReceipt(hash)
 
-      events.push(...LogParser(logs).map(log => ({
-        ...log,
-        txHash: hash,
-        blockHash,
-        blockNumber,
-        status,
-        timestamp
-      })))
+      logs
+        .map(logParser)
+        .filter(l => !!l)
+        .forEach(({ model, contractAddress, data }) => {
+          const commons = { txHash: hash, blockHash, blockNumber, status, timestamp }
+
+          if (!events[model.modelName]) events[model.modelName] = []
+          events[model.modelName].push({
+            ...commons,
+            ...data,
+            contractAddress
+          })
+        })
 
       transactions.push({
         from,
@@ -134,9 +139,14 @@ async function handleBlock (blockNum) {
 
   await Transaction.insertMany(transactions, { ordered: false })
 
-  if (events.length > 0) {
-    await Event.insertMany(events, { ordered: false })
-  }
+  const eventEntries = Object.entries(events)
+  await Bluebird.map(eventEntries, async ([modelName, _events]) => {
+    if (_events.length > 0) {
+      const model = eventList.find(event => event.model.modelName === modelName)
+      if (!model) throw new Error(`Unknown event model: ${modelName}`)
+      await model.insertMany(_events, { ordered: false })
+    }
+  }, { concurrency: 1 })
 
   const log = [
     `#${blockNumber}[${block.transactions.length}]`
